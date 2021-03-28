@@ -1,5 +1,5 @@
 import lcs
-import GUI
+import lcs_interface
 
 
 def main():
@@ -8,6 +8,8 @@ def main():
     print(res)
     print(time)
 
+    gui = lcs_interface.MainWindow()
+    gui.start_gui()
 
 
 if __name__ == '__main__':
