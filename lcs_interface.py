@@ -17,7 +17,13 @@ class MainWindow:
         self._lcs = lcs.LCS(4, [0.01, 0.01, 0.02, 0.01])
         self._buttons = []
         self._root = Tk()
+        self._start_button = Button(self._root, {"text": "Run"},
+                                    command=self._on_start_called)
         self._init_buttons()
+        self._init_gui()
+
+    def _on_start_called(self):
+        self._lcs.process()
 
     def _init_buttons(self):
         terminals = self._lcs.get_terminals()
@@ -47,6 +53,9 @@ class MainWindow:
         self._root.geometry(
             f'{self._window_height}x{self._window_width}+{self._window_position_height}+{self._window_position_width}')
         self._root.mainloop()
+
+    def _init_gui(self):
+        self._start_button.place(x=100, y=200, height=100, width=200)
 
 
 class TerminalDeviceButton(Button):

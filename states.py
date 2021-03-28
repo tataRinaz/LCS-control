@@ -27,3 +27,8 @@ class Timestamp(enum.Enum):
     WAIT_IF_BUSY = 6,
     WAIT_FOR_ANSWER = 7,
     WAIT_FOR_MESSAGE = 8
+
+
+class LCSType:
+    Standalone = 1,
+    Statistics = 2
