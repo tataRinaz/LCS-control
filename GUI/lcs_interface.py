@@ -1,7 +1,7 @@
 from tkinter import *
 from states import DeviceState
-from terminal_device import TerminalDevice
-import lcs
+from LCS.terminal_device import TerminalDevice
+import LCS.lcs as lcs
 
 COLOR = 'grey'
 BUTTON_HEIGHT = 15

@@ -1,5 +1,5 @@
-import lcs
-import lcs_interface
+import LCS.lcs as lcs
+import GUI.lcs_interface as interface
 
 
 def main():
@@ -8,7 +8,7 @@ def main():
     print(res)
     print(time)
 
-    gui = lcs_interface.MainWindow()
+    gui = interface.MainWindow()
     gui.start_gui()
 
 
