@@ -1,5 +1,5 @@
-from collections import Counter
 import csv
+from collections import Counter
 
 import lcs
 from states import LCSType, DeviceState
