@@ -3,13 +3,15 @@ from statistic_model import statistic_model, write_to_csv
 
 
 class StatisticEntry(tk.Entry):
-    def __init__(self, root, name, is_int: bool, correctness_checker):
+    def __init__(self, root, name, is_int: bool, correctness_checker, default_value, row):
         super().__init__(root)
         self.text_label = tk.Label(root, text=name)
-        self.text_label.pack()
+        self.text_label.grid(column=0, row=row)
         self.is_int = is_int
         self.correctness_checker = correctness_checker
-        self.pack()
+        self.insert(tk.END, default_value)
+        self.grid(column=1, row=row)
+        self.focus()
 
     def get(self):
         val = super().get()
@@ -25,34 +27,35 @@ class StatisticEntry(tk.Entry):
 
 
 class StatisticsUI(tk.Frame):
-    def __init__(self, root, height: int, width: int, change_frame_cb):
-        super().__init__(root, height=height, width=width)
-        self.change_frame_button = tk.Button(root, height=10, width=10, text='Change frame', command=change_frame_cb)
-        self.change_frame_button.pack()
+    def __init__(self, root, change_frame_cb):
+        super().__init__(root)
+        self.change_frame_cb = change_frame_cb
+        self.change_frame_button = tk.Button(self, text='Change frame', command=self._on_clicked)
+        self.change_frame_button.grid(column=0, row=0)
 
         def probability_check(val):
             return 0. <= val < 1.0
 
-        self.generation_probability_entry = StatisticEntry(root, is_int=False, correctness_checker=probability_check,
-                                                           name='Генерация')
-        self.denial_probability_entry = StatisticEntry(root, is_int=False, correctness_checker=probability_check,
-                                                       name='Отказ')
-        self.failure_probability_entry = StatisticEntry(root, is_int=False, correctness_checker=probability_check,
-                                                        name='Ошибка')
-        self.busy_probability_entry = StatisticEntry(root, is_int=False, correctness_checker=probability_check,
-                                                     name='Занят')
+        self.generation_probability_entry = StatisticEntry(self, is_int=False, correctness_checker=probability_check,
+                                                           name='Генерация', default_value=0.01, row=1)
+        self.denial_probability_entry = StatisticEntry(self, is_int=False, correctness_checker=probability_check,
+                                                       name='Отказ', default_value=0.01, row=2)
+        self.failure_probability_entry = StatisticEntry(self, is_int=False, correctness_checker=probability_check,
+                                                        name='Ошибка', default_value=0.01, row=3)
+        self.busy_probability_entry = StatisticEntry(self, is_int=False, correctness_checker=probability_check,
+                                                     name='Занят', default_value=0.01, row=4)
 
-        self.messages_count_entry = StatisticEntry(root, is_int=True,
+        self.messages_count_entry = StatisticEntry(self, is_int=True,
                                                    correctness_checker=lambda messages: messages > 100,
-                                                   name='Сообщения')
-        self.message_groups_entry = StatisticEntry(root, is_int=True, correctness_checker=lambda groups: groups > 2,
-                                                   name='Группы сообщений')
-        self.terminal_devices_entry = StatisticEntry(root, is_int=True,
+                                                   name='Сообщения', default_value=20000, row=5)
+        self.message_groups_entry = StatisticEntry(self, is_int=True, correctness_checker=lambda groups: groups > 2,
+                                                   name='Группы сообщений', default_value=20, row=6)
+        self.terminal_devices_entry = StatisticEntry(self, is_int=True,
                                                      correctness_checker=lambda terminals_counte: terminals_counte > 2,
-                                                     name='ОУ')
-        self.start_run = tk.Button(root, height=10, width=10, text='Start test',
-                                   command=self._on_start_statistic_clicked)
-        self.start_run.pack()
+                                                     name='ОУ', default_value=32, row=7)
+        self.start_run = tk.Button(self, text='Start test',
+                                    command=self._on_start_statistic_clicked)
+        self.start_run.grid(row=8, column=0)
 
     def _on_start_statistic_clicked(self):
         messages_count = self.messages_count_entry.get()
@@ -68,3 +71,6 @@ class StatisticsUI(tk.Frame):
             statistic = statistic_model(groups_count, messages_count, terminal_device_count,
                                         [gen_prob, den_prob, fail_prob, busy_prob])
             write_to_csv('output.csv', statistic)
+
+    def _on_clicked(self):
+        self.change_frame_cb()

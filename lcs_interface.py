@@ -1,4 +1,4 @@
-from tkinter import *
+import tkinter as tk
 
 from statistics_ui import StatisticsUI
 from standalone_ui import StandaloneUI
@@ -15,21 +15,22 @@ class MainWindow:
         self._window_position_height = window_position_height
         self._window_position_width = window_position_width
         self._buttons = []
-        self._root = Tk()
-        self._statistics_frame = StatisticsUI(root=self._root, height=self._window_height, width=self._window_width,
-                                              change_frame_cb=self.on_change_frame_clicked)
-        self._standalone_frame = StandaloneUI(root=self._root, height=self._window_height, width=self._window_width,
-                                              change_frame_cb=self.on_change_frame_clicked)
-        self._current_frame = self._standalone_frame
-        self._pending_frame = self._statistics_frame
+        self._root = tk.Tk()
+        self.frames = {0: StatisticsUI(root=self._root,
+                                       change_frame_cb=self._on_change_frame_clicked),
+                       1: StandaloneUI(root=self._root,
+                                       change_frame_cb=self._on_change_frame_clicked)}
+        self.active_frame = 1
 
     def start_gui(self):
         self._root.title("LVS")
         self._root.geometry(
             f'{self._window_height}x{self._window_width}+{self._window_position_height}+{self._window_position_width}')
-        self._current_frame.tkraise()
+        self._on_change_frame_clicked()
         self._root.mainloop()
 
-    def on_change_frame_clicked(self):
-        self._current_frame, self._pending_frame = self._pending_frame, self._current_frame
-        self._current_frame.tkraise()
+    def _on_change_frame_clicked(self):
+        self.frames[self.active_frame].grid_forget()
+        self.active_frame = 0 if self.active_frame == 1 else 1
+        frame = self.frames[self.active_frame]
+        frame.grid(row=0, column=0)

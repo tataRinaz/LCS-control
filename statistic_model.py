@@ -75,6 +75,8 @@ def write_to_csv(output_filename, statistics):
         for statistic in statistics:
             writer.writerow(statistic.as_list())
 
+        csv_file.close()
+
 
 if __name__ == '__main__':
     statistics = statistic_model(20, 20000, 18, [0.01, 0.01, 0.01, 0.01])
