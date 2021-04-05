@@ -13,6 +13,7 @@ class Statistics:
     failures_count: int
     generators_count: int
     busy_count: int
+    messages_per_run: int
 
     def __init__(self):
         self.run_index = 0
@@ -23,11 +24,12 @@ class Statistics:
         self.failures_count = 0
         self.generators_count = 0
         self.busy_count = 0
+        self.messages_per_run = 0
 
     def as_list(self):
         return [self.run_index, self.math_expectation, self.standard_deviation, self.elapsed_time, self.denials_count,
-                self.failures_count,
-                self.generators_count, self.busy_count]
+                self.failures_count, self.busy_count,
+                self.generators_count]
 
 
 def statistic_model(group_count, total_messages_count, terminals_count, probabilities):
@@ -64,11 +66,28 @@ def statistic_model(group_count, total_messages_count, terminals_count, probabil
         unprocessed_messages -= messages_per_run
         statistics.append(stats)
 
+    res = Statistics()
+    res.denials_count = sum(stats.denials_count for stats in statistics)
+    res.busy_count = sum(stats.busy_count for stats in statistics)
+    res.failures_count = sum(stats.failures_count for stats in statistics)
+    res.elapsed_time = sum(stats.elapsed_time for stats in statistics)
+
+    statistics.append(res)
+
     return statistics
 
 
 def write_to_csv(output_filename, statistics):
-    field_names = ['Номер прогона', 'МО', 'СКО', 'Затраченное время', 'Отказов', 'Сбоев', 'Занятых', 'Генераторов']
+    field_names = ['Номер прогона', 'МО', 'СКО', 'Затраченное время', 'Отказов', 'Сбоев', 'Занятых', 'Наличие генератора']
+
+    # If generator occured we should mark all runs as with generator
+    if any(filter(lambda stat: stat.generators_count > 0, statistics)):
+        def modify(stat):
+            stat.generators_count = 1
+            return stat
+
+        statistics = list(map(modify, statistics))
+
     with open(output_filename, 'w', newline='') as csv_file:
         writer = csv.writer(csv_file, delimiter=',')
         writer.writerow(field_names)

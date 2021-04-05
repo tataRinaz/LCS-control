@@ -30,20 +30,20 @@ class StatisticsUI(tk.Frame):
     def __init__(self, root, change_frame_cb):
         super().__init__(root)
         self.change_frame_cb = change_frame_cb
-        self.change_frame_button = tk.Button(self, text='Change frame', command=self._on_clicked)
+        self.change_frame_button = tk.Button(self, text='Перейти к визуальному образцу', command=self._on_clicked)
         self.change_frame_button.grid(column=0, row=0)
 
         def probability_check(val):
             return 0. <= val < 1.0
 
         self.generation_probability_entry = StatisticEntry(self, is_int=False, correctness_checker=probability_check,
-                                                           name='Генерация', default_value=0.01, row=1)
+                                                           name='Генерация', default_value=1/20000, row=1)
         self.denial_probability_entry = StatisticEntry(self, is_int=False, correctness_checker=probability_check,
-                                                       name='Отказ', default_value=0.01, row=2)
+                                                       name='Отказ', default_value=1/2000, row=2)
         self.failure_probability_entry = StatisticEntry(self, is_int=False, correctness_checker=probability_check,
-                                                        name='Ошибка', default_value=0.01, row=3)
+                                                        name='Ошибка', default_value=1/5000, row=3)
         self.busy_probability_entry = StatisticEntry(self, is_int=False, correctness_checker=probability_check,
-                                                     name='Занят', default_value=0.01, row=4)
+                                                     name='Занят', default_value=1/2000, row=4)
 
         self.messages_count_entry = StatisticEntry(self, is_int=True,
                                                    correctness_checker=lambda messages: messages > 100,
@@ -53,7 +53,7 @@ class StatisticsUI(tk.Frame):
         self.terminal_devices_entry = StatisticEntry(self, is_int=True,
                                                      correctness_checker=lambda terminals_counte: terminals_counte > 2,
                                                      name='ОУ', default_value=32, row=7)
-        self.start_run = tk.Button(self, text='Start test',
+        self.start_run = tk.Button(self, text='Запуск',
                                     command=self._on_start_statistic_clicked)
         self.start_run.grid(row=8, column=0)
 
