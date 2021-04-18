@@ -1,7 +1,8 @@
 import tkinter as tk
 
 from lcs import LCS
-from states import DeviceState
+from states import DeviceState, LineState
+from threading import Thread
 
 state_to_color = {
     DeviceState.WORKING: '#00FF00',
@@ -14,16 +15,16 @@ state_to_color = {
     DeviceState.INITIAL: '#FFFFFF'
 }
 options_map = {
-    'Рабочее': DeviceState.WORKING,
-    'Отказ': DeviceState.DENIAL,
-    'Занят': DeviceState.BUSY,
+    'Раб': DeviceState.WORKING,
+    'Отк': DeviceState.DENIAL,
+    'Зан': DeviceState.BUSY,
     'Сбой': DeviceState.FAILURE,
-    'Заблокирован': DeviceState.BLOCKED,
-    'Генератор': DeviceState.GENERATOR,
-    'Разблокирован': DeviceState.UNBLOCKING,
-    'ИЗначальное': DeviceState.INITIAL
+    'Блок': DeviceState.BLOCKED,
+    'Ген': DeviceState.GENERATOR,
+    'Разблок': DeviceState.UNBLOCKING
 }
-state_to_name = {value:key for key, value in options_map.items()}
+state_to_name = {value: key for key, value in options_map.items()}
+
 
 class TerminalDeviceView(tk.Frame):
     def __init__(self, root, device_index, devices_cb):
@@ -31,22 +32,25 @@ class TerminalDeviceView(tk.Frame):
         self.index = device_index
         self.devices_cb = devices_cb
 
-        terminals = devices_cb()
-        terminals[self.index].set_state_change_callback(self._recolor_on_state)
+        self.device_state_view = tk.Frame(self, bg='#000000', width=10, height=10)
+        self.device_state_view.grid(row=1, column=0)
 
-        options = ['Рабочее', 'Отказ', 'Занят', 'Сбой', 'Заблокирован', 'Генератор']
+        options = ['Раб', 'Отк', 'Зан', 'Сбой', 'Блок', 'Ген']
 
         self.device_state = tk.StringVar()
         self.states_option_menu = tk.OptionMenu(self, self.device_state, *options)
         self.states_option_menu.grid(row=0, column=0)
-        self.states_change_button = tk.Button(self, text='Выбрать', command=self._process_state_change)
-        self.states_change_button.grid(row=0, column=1)
-        self._process_state_change()
 
-        self.device_state_view = tk.Frame(self, bg='#000000', width=10, height=10)
-        self.device_state_view.grid(row=1, column=0)
+        terminals = devices_cb()
+        terminals[self.index].set_state_change_callback(self._recolor_on_state)
+        terminals[self.index].change_state(DeviceState.WORKING)
 
-    def _process_state_change(self):
+        self._name_label = tk.Label(self, text=f'ОУ №{self.index}')
+        self._name_label.grid(row=2, column=0)
+        self.process_state_change()
+        self.configure(highlightbackground="red", highlightcolor="red", highlightthickness=5)
+
+    def process_state_change(self):
         devices = self.devices_cb()
 
         value = self.device_state.get()
@@ -56,21 +60,46 @@ class TerminalDeviceView(tk.Frame):
             self._recolor_on_state()
 
     def _recolor_on_state(self):
-
         devices = self.devices_cb()
         state = devices[self.index].state
         self.device_state.set(state_to_name[state])
         self.device_state_view.configure(bg=state_to_color[state])
 
 
-class StandaloneUI(tk.Frame):
-    def __init__(self, root, change_frame_cb):
+class WorkingLineState(tk.Frame):
+    def __init__(self, root):
         super().__init__(root)
-        self._change_frame_button = tk.Button(self, text='Перейти к статистической модели', command=change_frame_cb)
-        self._change_frame_button.grid(column=0, row=0)
+        self._line_text_label = tk.Label(self)
+        self._line_text_label.grid(row=0, column=0)
+        self.on_line_state_changed(LineState.WORKING_LINE_A)
 
-        terminals_count = 4
-        self._lcs = LCS(terminals_count=terminals_count, probabilities=[0, 0, 0, 0])
+    def on_line_state_changed(self, state):
+        line = 'Линия B' if state == LineState.WORKING_LINE_B else 'Линия А'
+        state = 'Генерация' if state == LineState.GENERATION else 'Рабочая'
+        self._line_text_label.configure(text=line + ': ' + state)
+
+
+class LCSRunThread(Thread):
+    def __init__(self, task):
+        Thread.__init__(self)
+        self.task = task
+
+    def run(self):
+        try:
+            self.task()
+        except Exception as e:
+            print(e)
+
+
+class LCSView(tk.Frame):
+    def __init__(self, root):
+        super().__init__(root)
+
+        terminals_count = 18
+        self._line_state_view = WorkingLineState(self)
+        self._line_state_view.grid(row=0, column=0)
+        self._lcs = LCS(terminals_count=terminals_count, probabilities=[0, 0, 0, 0],
+                        line_state_change_handler=self._line_state_view.on_line_state_changed)
         self._terminal_views = []
         row = 1
         column = 0
@@ -80,17 +109,37 @@ class StandaloneUI(tk.Frame):
             self._terminal_views.append(terminal_view)
 
             column += 1
-            if column == 4:
-                column = 0
-                row += 1
 
-        self._start_button = tk.Button(self, text='Запустить ЛВС', command=self._on_start_clicked)
-        self._start_button.grid(row=row + 1, column=0)
-        self._clear_button = tk.Button(self, text='Очистить ЛВС', command=self._on_clear_clicked)
-        self._clear_button.grid(row=row + 1, column=1)
+        self.configure(highlightbackground="green", highlightcolor="green", highlightthickness=5)
+
+    def get_terminal_views(self):
+        return self._terminal_views
+
+    def get_lcs_thread(self):
+        return LCSRunThread(self._lcs.process)
+
+
+class StandaloneUI(tk.Frame):
+    def __init__(self, root, change_frame_cb):
+        super().__init__(root)
+        self._change_frame_button = tk.Button(self, text='Перейти к статистической модели', command=change_frame_cb)
+        self._change_frame_button.grid(column=0, row=0)
+
+        self._lcs_frame = LCSView(self)
+        self._lcs_frame.grid(column=0, row=1)
+
+        self._state_select_button = tk.Button(self, text='Применить состояния ОУ',
+                                              command=self._on_state_select_clicked)
+        self._state_select_button.grid(row=2, column=0)
+        self._start_button = tk.Button(self, text='Запустить', command=self._on_start_clicked)
+        self._start_button.grid(row=3, column=0)
 
     def _on_start_clicked(self):
-        self._lcs.process()
+        self._lcs_frame.get_lcs_thread().start()
 
     def _on_clear_clicked(self):
         self._lcs = LCS(4, [0, 0, 0, 0])
+
+    def _on_state_select_clicked(self):
+        for index in range(len(self._lcs_frame.get_terminal_views())):
+            self._lcs_frame.get_terminal_views()[index].process_state_change()

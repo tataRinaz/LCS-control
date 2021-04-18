@@ -37,13 +37,13 @@ class StatisticsUI(tk.Frame):
             return 0. <= val < 1.0
 
         self.generation_probability_entry = StatisticEntry(self, is_int=False, correctness_checker=probability_check,
-                                                           name='Генерация', default_value=1/20000, row=1)
+                                                           name='Генерация', default_value=1 / 20000, row=1)
         self.denial_probability_entry = StatisticEntry(self, is_int=False, correctness_checker=probability_check,
-                                                       name='Отказ', default_value=1/2000, row=2)
+                                                       name='Отказ', default_value=1 / 5000, row=2)
         self.failure_probability_entry = StatisticEntry(self, is_int=False, correctness_checker=probability_check,
-                                                        name='Ошибка', default_value=1/5000, row=3)
+                                                        name='Сбой', default_value=1 / 2000, row=3)
         self.busy_probability_entry = StatisticEntry(self, is_int=False, correctness_checker=probability_check,
-                                                     name='Занят', default_value=1/2000, row=4)
+                                                     name='Занят', default_value=1 / 2000, row=4)
 
         self.messages_count_entry = StatisticEntry(self, is_int=True,
                                                    correctness_checker=lambda messages: messages > 100,
@@ -52,9 +52,9 @@ class StatisticsUI(tk.Frame):
                                                    name='Группы сообщений', default_value=20, row=6)
         self.terminal_devices_entry = StatisticEntry(self, is_int=True,
                                                      correctness_checker=lambda terminals_counte: terminals_counte > 2,
-                                                     name='ОУ', default_value=32, row=7)
+                                                     name='ОУ', default_value=18, row=7)
         self.start_run = tk.Button(self, text='Запуск',
-                                    command=self._on_start_statistic_clicked)
+                                   command=self._on_start_statistic_clicked)
         self.start_run.grid(row=8, column=0)
 
     def _on_start_statistic_clicked(self):

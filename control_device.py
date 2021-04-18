@@ -117,6 +117,7 @@ class ControlDevice:
 
             terminals[index].end_messaging("Terminal device: generator denial")
             generator_index = index
+            break
 
         for index in range(generator_index + 1, terminals_count):
             self.time_counter.append_time(Timestamp.UNBLOCK)
