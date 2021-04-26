@@ -1,5 +1,19 @@
 import tkinter as tk
-from statistic_model import statistic_model, write_to_csv
+from threading import Thread
+from statistic_model import statistic_model, write_single_statistic_to_csv, write_sessions_statistic_to_csv, \
+    StatisticRunner
+
+
+class LCSRunThread(Thread):
+    def __init__(self, task):
+        Thread.__init__(self)
+        self.task = task
+
+    def run(self):
+        try:
+            self.task()
+        except Exception as e:
+            print(e)
 
 
 class StatisticEntry(tk.Entry):
@@ -24,6 +38,43 @@ class StatisticEntry(tk.Entry):
             return parsed
         except Exception as e:
             print(e)
+
+
+class RunTaskBar(tk.Frame):
+    _session_count: int
+
+    def __init__(self, root):
+        super().__init__(root)
+
+        self._sessions_count = None
+        self._frames_count = 100
+        self._frames = [tk.Frame(self, bg='white', width=2, height=15) for _ in range(self._frames_count)]
+        for index in range(self._frames_count):
+            self._frames[index].grid(row=0, column=index)
+
+        self._current_frame_index = 0
+
+    def set_session_count(self, session_count):
+        self._sessions_count = session_count
+
+    def update_bar(self, sessions_passed):
+        if self._sessions_count is None or self._sessions_count <= 0:
+            raise RuntimeError('Session count is invalid')
+
+        frames_to_update = int(sessions_passed / self._sessions_count * self._frames_count)
+        last_frame = self._current_frame_index + frames_to_update
+        if last_frame > self._frames_count:
+            last_frame = self._frames_count
+
+        for index in range(self._current_frame_index, last_frame):
+            self._frames[index].configure(bg='blue')
+
+        self._current_frame_index = last_frame
+
+    def flush(self):
+        self._current_frame_index = 0
+        for index in range(len(self._frames)):
+            self._frames[index].configure(bg='white')
 
 
 class StatisticsUI(tk.Frame):
@@ -53,24 +104,55 @@ class StatisticsUI(tk.Frame):
         self.terminal_devices_entry = StatisticEntry(self, is_int=True,
                                                      correctness_checker=lambda terminals_counte: terminals_counte > 2,
                                                      name='ОУ', default_value=18, row=7)
+        self.sessions_count_entry = StatisticEntry(self, is_int=True,
+                                                   correctness_checker=lambda sessions_count: sessions_count > 0,
+                                                   name='Количество сеансов', default_value=50, row=8)
         self.start_run = tk.Button(self, text='Запуск',
                                    command=self._on_start_statistic_clicked)
-        self.start_run.grid(row=8, column=0)
+        self.start_run.grid(row=9, column=0)
+        self.task_run_bar = RunTaskBar(self)
+        self.task_run_bar.grid(row=10, column=0)
+
+    def _process_statistics(self, messages_count, groups_count, terminal_device_count, gen_prob, den_prob, fail_prob,
+                            busy_prob, sessions_count):
+        if messages_count and \
+                groups_count and \
+                terminal_device_count and \
+                gen_prob and \
+                den_prob and \
+                fail_prob and \
+                busy_prob:
+            if sessions_count is None:
+                statistic = statistic_model(groups_count, messages_count, terminal_device_count,
+                                            [gen_prob, den_prob, fail_prob, busy_prob])
+
+                write_single_statistic_to_csv('output.csv', statistic)
+            else:
+                runner = StatisticRunner(sessions_count, groups_count, messages_count, terminal_device_count,
+                                         [gen_prob, den_prob, fail_prob, busy_prob], self.task_run_bar.update_bar)
+                LCSRunThread(runner.run).start()
+                while not runner.is_ready():
+                    pass
+
+                write_sessions_statistic_to_csv('sessions_output.csv', runner.results())
 
     def _on_start_statistic_clicked(self):
         messages_count = self.messages_count_entry.get()
         groups_count = self.message_groups_entry.get()
         terminal_device_count = self.terminal_devices_entry.get()
+        sessions_count = self.sessions_count_entry.get()
 
         gen_prob = self.generation_probability_entry.get()
         den_prob = self.denial_probability_entry.get()
         fail_prob = self.failure_probability_entry.get()
         busy_prob = self.busy_probability_entry.get()
 
-        if messages_count and groups_count and terminal_device_count and gen_prob and den_prob and fail_prob and busy_prob:
-            statistic = statistic_model(groups_count, messages_count, terminal_device_count,
-                                        [gen_prob, den_prob, fail_prob, busy_prob])
-            write_to_csv('output.csv', statistic)
+        self.task_run_bar.flush()
+        self.task_run_bar.set_session_count(sessions_count)
+
+        LCSRunThread(
+            lambda: self._process_statistics(messages_count, groups_count, terminal_device_count, gen_prob, den_prob,
+                                             fail_prob, busy_prob, sessions_count)).start()
 
     def _on_clicked(self):
         self.change_frame_cb()

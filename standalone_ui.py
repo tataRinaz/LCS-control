@@ -5,14 +5,12 @@ from states import DeviceState, LineState
 from threading import Thread
 
 state_to_color = {
-    DeviceState.WORKING: '#00FF00',
-    DeviceState.DENIAL: '#0000FF',
-    DeviceState.BUSY: '#FF0000',
-    DeviceState.FAILURE: '#FF0000',
-    DeviceState.BLOCKED: '#FFFF00',
-    DeviceState.GENERATOR: '#00FFFF',
-    DeviceState.UNBLOCKING: '#FF00FF',
-    DeviceState.INITIAL: '#FFFFFF'
+    DeviceState.WORKING: 'green',
+    DeviceState.DENIAL: 'red',
+    DeviceState.BUSY: 'orange',
+    DeviceState.FAILURE: 'yellow',
+    DeviceState.BLOCKED: 'purple',
+    DeviceState.GENERATOR: 'blue',
 }
 options_map = {
     'Раб': DeviceState.WORKING,
@@ -27,8 +25,8 @@ state_to_name = {value: key for key, value in options_map.items()}
 
 
 class TerminalDeviceView(tk.Frame):
-    def __init__(self, root, device_index, devices_cb):
-        super().__init__(root)
+    def __init__(self, root, device_index, devices_cb, is_up):
+        super().__init__(root, width=200, height=100)
         self.index = device_index
         self.devices_cb = devices_cb
 
@@ -48,7 +46,7 @@ class TerminalDeviceView(tk.Frame):
         self._name_label = tk.Label(self, text=f'ОУ №{self.index}')
         self._name_label.grid(row=2, column=0)
         self.process_state_change()
-        self.configure(highlightbackground="red", highlightcolor="red", highlightthickness=5)
+        self.configure(highlightbackground="green", highlightcolor="green", highlightthickness=5)
 
     def process_state_change(self):
         devices = self.devices_cb()
@@ -66,17 +64,13 @@ class TerminalDeviceView(tk.Frame):
         self.device_state_view.configure(bg=state_to_color[state])
 
 
-class WorkingLineState(tk.Frame):
+class ControllerView(tk.Frame):
     def __init__(self, root):
         super().__init__(root)
-        self._line_text_label = tk.Label(self)
-        self._line_text_label.grid(row=0, column=0)
-        self.on_line_state_changed(LineState.WORKING_LINE_A)
-
-    def on_line_state_changed(self, state):
-        line = 'Линия B' if state == LineState.WORKING_LINE_B else 'Линия А'
-        state = 'Генерация' if state == LineState.GENERATION else 'Рабочая'
-        self._line_text_label.configure(text=line + ': ' + state)
+        self._text_label = tk.Label(self, text='Контроллер')
+        self._text_label.grid(row=0, column=0)
+        self.configure(highlightbackground="red", highlightcolor="red", highlightthickness=5,
+                       bg="yellow")
 
 
 class LCSRunThread(Thread):
@@ -91,26 +85,74 @@ class LCSRunThread(Thread):
             print(e)
 
 
+CONNECTION_COLOR = "green"
+INACTIVE_COLOR = "gray"
+
+
+class DataLineView(tk.Frame):
+    def __init__(self, root: tk.Frame, color):
+        super().__init__(root)
+        self._canvas = tk.Canvas(self, width=750, height=10)
+        self._color = color
+        self._fill_canvases()
+
+    def _fill_canvases(self):
+        self._canvas.create_line(0, 10, 750, 10, width=10, fill=self._color)
+        self._canvas.grid(row=0, column=0)
+
+
+class DataLineMarker:
+    def __init__(self, root, row, colspan, name, color):
+        self._data_line_view = DataLineView(root, color)
+        self._data_line_view.grid(row=row, column=1, columnspan=colspan)
+        self._text_label = tk.Label(root, text=name)
+        self._text_label.grid(row=row, column=0)
+
+
+class DataLineHolder:
+    def __init__(self, root, min_row, colspan):
+        self._root = root
+
+        self._up_connectors = [tk.Canvas(root, height=100, width=50) for _ in range(colspan - 1)]
+        self._grid_connectors(min_row)
+
+        self._a_data_line = DataLineMarker(root, min_row + 1, colspan, 'A', CONNECTION_COLOR)
+        self._b_data_line = DataLineMarker(root, min_row + 2, colspan, 'B', INACTIVE_COLOR)
+        self._connect_to_a()
+
+    def _grid_connectors(self, row):
+        for index, _ in enumerate(self._up_connectors):
+            self._up_connectors[index].grid(row=row, rowspan=3, column=index + 1)
+
+    def _connect_to_a(self):
+        for index, _ in enumerate(self._up_connectors):
+            self._up_connectors[index].create_line(20, 0, 20, 40, fill=CONNECTION_COLOR, width=5)
+            self._up_connectors[index].create_line(30, 35, 30, 100, fill=CONNECTION_COLOR, width=5)
+
+
 class LCSView(tk.Frame):
     def __init__(self, root):
         super().__init__(root)
 
         terminals_count = 18
-        self._line_state_view = WorkingLineState(self)
-        self._line_state_view.grid(row=0, column=0)
-        self._lcs = LCS(terminals_count=terminals_count, probabilities=[0, 0, 0, 0],
-                        line_state_change_handler=self._line_state_view.on_line_state_changed)
+        self._lcs = LCS(terminals_count=terminals_count, probabilities=[0, 0, 0, 0])
         self._terminal_views = []
-        row = 1
-        column = 0
+        column = 1
+        current_row, next_row = 1, 6
+
         for i in range(terminals_count):
-            terminal_view = TerminalDeviceView(self, i, self._lcs.get_terminals)
-            terminal_view.grid(row=row, column=column)
+            terminal_view = TerminalDeviceView(self, i, self._lcs.get_terminals, current_row == 1)
+            terminal_view.grid(row=current_row, column=column)
             self._terminal_views.append(terminal_view)
 
-            column += 1
+            current_row, next_row = next_row, current_row
 
-        self.configure(highlightbackground="green", highlightcolor="green", highlightthickness=5)
+            if current_row == 1:
+                column += 1
+
+        self._data_line_holder = DataLineHolder(self, min_row=2, colspan=column)
+        self._controller_view = ControllerView(self)
+        self._controller_view.grid(row=7, column=0)
 
     def get_terminal_views(self):
         return self._terminal_views

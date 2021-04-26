@@ -62,7 +62,8 @@ class LCS:
             else:
                 return 'ЛИНИЯ B'
 
-        print(f"ЛПИ - {to_string(new_state)}")
+        if self.type == LCSType.Standalone:
+            print(f"ЛПИ - {to_string(new_state)}")
 
         if any(map(lambda terminal: terminal.state == DeviceState.GENERATOR, self.terminals)):
             self.line_state = LineState.GENERATION

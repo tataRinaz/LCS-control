@@ -1,5 +1,6 @@
 import csv
 from collections import Counter
+from threading import Thread, Lock
 
 import lcs
 from states import LCSType, DeviceState
@@ -12,6 +13,8 @@ class Statistics:
     generators_count: int
     busy_count: int
     messages_per_run: int
+    generators_indices: []
+    denials_indices: []
 
     def __init__(self):
         self.run_index = 0
@@ -23,6 +26,8 @@ class Statistics:
         self.messages_per_run = 0
         self.math_expectation = 0
         self.standard_deviation = 0
+        self.generators_indices = []
+        self.denials_indices = []
 
     def as_list(self):
         return [self.run_index,
@@ -35,20 +40,24 @@ class Statistics:
                 self.standard_deviation]
 
 
-def get_generator_index(stats: [Statistics]):
+def get_value_index(stats: [Statistics], field_name: str):
+    generators = []
     for i in range(len(stats)):
-        if stats[i].generators_count != 0:
-            return i
+        if getattr(stats[i], field_name, 0) != 0:
+            generators.append(i)
 
-    return None
+    return generators
 
 
 def process_statistics(stats: [Statistics]):
     denial_count = 0
 
-    generator_index = get_generator_index(stats)
+    generator_index = get_value_index(stats, 'generators_count')
 
-    generator_wasted_time = 3.08 + 0.052 * generator_index if generator_index is not None else 0.
+    generator_wasted_time = 3.08 + 0.052 * generator_index[0] if len(generator_index) != 0 else 0.
+
+    def make_correct(val):
+        return int(val * 1000) / 1000
 
     for i in range(len(stats)):
         denial_count += stats[i].denials_count
@@ -62,12 +71,12 @@ def process_statistics(stats: [Statistics]):
         if generator_index is not None:
             wasted_time += 29.920
 
-        stats[i].elapsed_time = wasted_time
+        stats[i].elapsed_time = make_correct(wasted_time)
 
     math_expectation = sum(stat.elapsed_time for stat in stats) / len(stats)
-    standart_deviation = sum((math_expectation - stat.elapsed_time) ** 2 for stat in stats)
+    standart_deviation = (sum((math_expectation - stat.elapsed_time) ** 2 for stat in stats) / len(stats)) ** 0.5
 
-    return stats, math_expectation, standart_deviation
+    return make_correct(math_expectation), make_correct(standart_deviation)
 
 
 def statistic_model(group_count, total_messages_count, terminals_count, probabilities):
@@ -75,6 +84,7 @@ def statistic_model(group_count, total_messages_count, terminals_count, probabil
     statistics = []
 
     unprocessed_messages = total_messages_count
+    totals = Statistics()
     for group_num in range(group_count):
         stats = Statistics()
         stats.run_index = group_num + 1
@@ -92,33 +102,99 @@ def statistic_model(group_count, total_messages_count, terminals_count, probabil
         stats.failures_count = device_states_counter[DeviceState.FAILURE]
         stats.generators_count = device_states_counter[DeviceState.GENERATOR]
 
+        totals.denials_count += device_states_counter[DeviceState.DENIAL]
+        totals.busy_count += device_states_counter[DeviceState.BUSY]
+        totals.failures_count += device_states_counter[DeviceState.FAILURE]
+        totals.generators_count += device_states_counter[DeviceState.DENIAL]
+
+        if stats.generators_count != 0:
+            totals.generators_indices.append(group_num)
+
+        if stats.denials_count != 0:
+            totals.denials_indices.append(group_num)
+
         unprocessed_messages -= messages_per_run
         statistics.append(stats)
 
-    stats, math_expect, standard_deviation = process_statistics(statistics)
+    math_expect, standard_deviation = process_statistics(statistics)
 
-    res = Statistics()
-    res.denials_count = sum(stats.denials_count for stats in statistics)
-    res.busy_count = sum(stats.busy_count for stats in statistics)
-    res.failures_count = sum(stats.failures_count for stats in statistics)
-    res.elapsed_time = sum(stats.elapsed_time for stats in statistics)
-    res.math_expectation = math_expect
-    res.standard_deviation = standard_deviation
-
-    statistics.append(res)
+    totals.math_expectation = math_expect
+    totals.standard_deviation = standard_deviation
+    statistics.append(totals)
 
     return statistics
 
 
-def write_to_csv(output_filename, statistics):
-    field_names = ['Тысяча сообщений', 'Отказов', 'Сбоев', 'Занятых',
-                   'Наличие генератора', 'Затраченное время', 'МО', 'СКО']
+class LCSRunThread(Thread):
+    def __init__(self, task):
+        Thread.__init__(self)
+        self.task = task
 
-    generator_index = get_generator_index(statistics)
+    def run(self):
+        try:
+            self.task()
+        except Exception as e:
+            print(e)
+
+
+class StatisticRunner:
+    def __init__(self, sessions_count, group_count, total_messages_count, terminals_count, probabilities,
+                 task_bar_update_cb):
+        self._statistics_per_run = 25
+        assert sessions_count % self._statistics_per_run == 0,\
+            f"Sessions count should be divisible by {self._statistics_per_run}"
+        self._sessions_count = sessions_count
+        self._group_count = group_count
+        self._total_messages_count = total_messages_count
+        self._terminals_count = terminals_count
+        self._probabilities = probabilities
+        self._task_bar_update_cb = task_bar_update_cb
+        self._processed_count = 0
+        self._started_index = 0
+        self._mutex = Lock()
+
+        self._results = []
+
+    def make_statistic(self):
+        statistic = statistic_model(self._group_count,
+                                    self._total_messages_count,
+                                    self._terminals_count,
+                                    self._probabilities.copy())[-1]
+
+        self._mutex.acquire()
+        self._task_bar_update_cb(1)
+        self._processed_count += 1
+        print(f"Finished {self._processed_count}")
+        self._mutex.release()
+
+        return statistic
+
+    def make_single_run(self):
+        result = [self.make_statistic() for _ in range(self._statistics_per_run)]
+        self._mutex.acquire()
+        self._results += result
+        self._mutex.release()
+
+    def run(self):
+        for _ in range(int(self._sessions_count / self._statistics_per_run)):
+            LCSRunThread(self.make_single_run).start()
+
+    def is_ready(self):
+        return self._processed_count == self._sessions_count
+
+    def results(self):
+        return self._results
+
+
+def write_single_statistic_to_csv(output_filename, statistics):
+    field_names = ['Тысяча сообщений', 'Отказов', 'Сбоев', '"АБонент занят"',
+                   'Наличие генератора', 'Затраченное время, мс', 'МО', 'СКО']
+
+    generator_index = get_value_index(statistics, 'generators_count')
     # If generator occured we should mark all runs as with generator
-    if generator_index is not None:
+    if len(generator_index) != 0:
         def modify(stat):
-            stat.generators_count = generator_index
+            stat.generators_count = generator_index[0]
             return stat
 
         statistics = list(map(modify, statistics))
@@ -132,6 +208,24 @@ def write_to_csv(output_filename, statistics):
         csv_file.close()
 
 
-if __name__ == '__main__':
-    statistics, me, std = statistic_model(20, 20000, 18, [0.01, 0.01, 0.01, 0.01])
-    write_to_csv('output.csv', statistics, me, std)
+def write_sessions_statistic_to_csv(output_filename, statistics):
+    field_names = ['Номер сеанса', 'Число сбоев', 'Число "абонент занят"', 'Число отказов и m для каждого из них',
+                   'Число генераций и Nг для каждого из них', 'Среднее время передачи сообщения', 'СКО']
+
+    with open(output_filename, 'w', newline='') as csv_file:
+        writer = csv.writer(csv_file, delimiter=',')
+        writer.writerow(field_names)
+        for statistic in statistics:
+            denials_stats = str(statistic.denials_count) + ": " + ",".join(map(str, statistic.denials_indices))
+            generator_stats = str(statistic.generators_count) + ": " + ",".join(map(str, statistic.generators_indices))
+
+            row = [str(statistic.run_index),
+                   str(statistic.failures_count),
+                   str(statistic.busy_count),
+                   denials_stats,
+                   generator_stats,
+                   str(statistic.math_expectation),
+                   str(statistic.standard_deviation)]
+            writer.writerow(row)
+
+        csv_file.close()
