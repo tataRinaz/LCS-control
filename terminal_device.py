@@ -3,7 +3,8 @@ from randoms import get_random_state
 
 
 class TerminalDevice:
-    def __init__(self, system, index, probabilities, line_state_callback, line_state_change_callback, terminals_callback):
+    def __init__(self, system, index, probabilities, line_state_callback, line_state_change_callback,
+                 terminals_callback, logger_cb=None):
         self.system = system
         self.index = index
         self.state = DeviceState.INITIAL
@@ -12,13 +13,14 @@ class TerminalDevice:
         self.line_state_callback = line_state_callback
         self.line_state_change_callback = line_state_change_callback
         self.terminal_callback = terminals_callback
-        self.state_change_callback = None
+        self.state_change_callbacks = []
+        self.logger_cb = logger_cb
         self.last_message = None
         self.active = False
 
     def _on_message_received(self, message):
         if self.system == LCSType.Standalone:
-            print(f'ОУ №{self.index} получил сообщение: {message}')
+            self.logger_cb(f'ОУ №{self.index}: {message}')
         self.last_message = message
 
     def _on_state_change(self, new_state):
@@ -48,8 +50,8 @@ class TerminalDevice:
             self.prev_state = self.state
             self._on_state_change(new_state)
 
-        if self.state_change_callback:
-            self.state_change_callback()
+        for callback in self.state_change_callbacks:
+            callback()
 
     def process(self):
         if self.state == DeviceState.INITIAL:
@@ -62,5 +64,5 @@ class TerminalDevice:
 
         return random_state
 
-    def set_state_change_callback(self, callback):
-        self.state_change_callback = callback
+    def append_state_change_callback(self, callback):
+        self.state_change_callbacks.append(callback)

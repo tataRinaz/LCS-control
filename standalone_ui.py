@@ -1,4 +1,5 @@
 import tkinter as tk
+import datetime as dt
 
 from lcs import LCS
 from states import DeviceState, LineState
@@ -26,7 +27,7 @@ state_to_name = {value: key for key, value in options_map.items()}
 
 class TerminalDeviceView(tk.Frame):
     def __init__(self, root, device_index, devices_cb, is_up):
-        super().__init__(root, width=200, height=100)
+        super().__init__(root, width=300, height=100)
         self.index = device_index
         self.devices_cb = devices_cb
 
@@ -40,12 +41,13 @@ class TerminalDeviceView(tk.Frame):
         self.states_option_menu.grid(row=0, column=0)
 
         terminals = devices_cb()
-        terminals[self.index].set_state_change_callback(self._recolor_on_state)
+        terminals[self.index].append_state_change_callback(self._recolor_on_state)
         terminals[self.index].change_state(DeviceState.WORKING)
 
-        self._name_label = tk.Label(self, text=f'ОУ №{self.index}')
+        self._name_label = tk.Label(self, text=f'ОУ №{self.index + 1}')
         self._name_label.grid(row=2, column=0)
         self.process_state_change()
+        self._is_up = is_up
         self.configure(highlightbackground="green", highlightcolor="green", highlightthickness=5)
 
     def process_state_change(self):
@@ -62,6 +64,9 @@ class TerminalDeviceView(tk.Frame):
         state = devices[self.index].state
         self.device_state.set(state_to_name[state])
         self.device_state_view.configure(bg=state_to_color[state])
+
+    def is_up(self):
+        return self._is_up
 
 
 class ControllerView(tk.Frame):
@@ -85,80 +90,112 @@ class LCSRunThread(Thread):
             print(e)
 
 
-CONNECTION_COLOR = "green"
+ACTIVE_COLOR = "green"
 INACTIVE_COLOR = "gray"
 
 
-class DataLineView(tk.Frame):
-    def __init__(self, root: tk.Frame, color):
-        super().__init__(root)
-        self._canvas = tk.Canvas(self, width=750, height=10)
-        self._color = color
-        self._fill_canvases()
-
-    def _fill_canvases(self):
-        self._canvas.create_line(0, 10, 750, 10, width=10, fill=self._color)
-        self._canvas.grid(row=0, column=0)
-
-
-class DataLineMarker:
-    def __init__(self, root, row, colspan, name, color):
-        self._data_line_view = DataLineView(root, color)
-        self._data_line_view.grid(row=row, column=1, columnspan=colspan)
-        self._text_label = tk.Label(root, text=name)
-        self._text_label.grid(row=row, column=0)
-
-
-class DataLineHolder:
-    def __init__(self, root, min_row, colspan):
+class DataLineView:
+    def __init__(self, root: tk.Canvas, name, position_start, position_end):
         self._root = root
+        self._name_label = self._root.create_text(position_end[0] - 20, position_end[1], text=name)
+        self._data_line_position = position_end
 
-        self._up_connectors = [tk.Canvas(root, height=100, width=50) for _ in range(colspan - 1)]
-        self._grid_connectors(min_row)
+        self._lines = [self._root.create_line(position_start[0], position_start[1], position_end[0],
+                                              position_end[1],
+                                              width=5),
+                       self._root.create_line(position_end[0], position_end[1], position_end[0] + 1400,
+                                              position_end[1], width=5)]
 
-        self._a_data_line = DataLineMarker(root, min_row + 1, colspan, 'A', CONNECTION_COLOR)
-        self._b_data_line = DataLineMarker(root, min_row + 2, colspan, 'B', INACTIVE_COLOR)
-        self._connect_to_a()
+    def activate(self):
+        for line_index in self._lines:
+            self._root.itemconfig(line_index, fill=ACTIVE_COLOR)
 
-    def _grid_connectors(self, row):
-        for index, _ in enumerate(self._up_connectors):
-            self._up_connectors[index].grid(row=row, rowspan=3, column=index + 1)
+    def deactivate(self):
+        for line_index in self._lines:
+            self._root.itemconfig(line_index, fill=INACTIVE_COLOR)
 
-    def _connect_to_a(self):
-        for index, _ in enumerate(self._up_connectors):
-            self._up_connectors[index].create_line(20, 0, 20, 40, fill=CONNECTION_COLOR, width=5)
-            self._up_connectors[index].create_line(30, 35, 30, 100, fill=CONNECTION_COLOR, width=5)
+    def connect_terminal(self, terminal: TerminalDeviceView):
+        is_up = terminal.is_up()
+        x_position = terminal.winfo_x() + terminal.winfo_width() / 2
+        y_position = terminal.winfo_y() if is_up else terminal.winfo_y() + terminal.winfo_height()
+
+        self._lines.append(self._root.create_line(x_position, y_position, x_position, self._data_line_position[1],
+                                                  width=5))
 
 
-class LCSView(tk.Frame):
-    def __init__(self, root):
-        super().__init__(root)
+class LCSView(tk.Canvas):
+    def __init__(self, root, logger_cb, height=250, width=1600):
+        super().__init__(root, height=height, width=width)
 
         terminals_count = 18
-        self._lcs = LCS(terminals_count=terminals_count, probabilities=[0, 0, 0, 0])
+
+        self._top_data_line = DataLineView(self, "A", (50, 115), (50, 10))
+        self._bot_data_line = DataLineView(self, "B", (50, 135), (50, 245))
+
+        self._lcs = LCS(terminals_count=terminals_count, probabilities=[0, 0, 0, 0],
+                        line_state_change_handler=self.on_line_state_changed, logger_cb=logger_cb)
         self._terminal_views = []
         column = 1
-        current_row, next_row = 1, 6
 
-        for i in range(terminals_count):
-            terminal_view = TerminalDeviceView(self, i, self._lcs.get_terminals, current_row == 1)
-            terminal_view.grid(row=current_row, column=column)
-            self._terminal_views.append(terminal_view)
+        for i in range(int(terminals_count)):
+            top_terminal = TerminalDeviceView(self, i, self._lcs.get_terminals, True)
+            bot_terminal = TerminalDeviceView(self, i, self._lcs.get_terminals, False)
+            top_terminal.place(x=100 + 70 * i, y=60)
+            bot_terminal.place(x=100 + 70 * i, y=130)
 
-            current_row, next_row = next_row, current_row
+            self._terminal_views.append(top_terminal)
+            self._terminal_views.append(bot_terminal)
 
-            if current_row == 1:
-                column += 1
+            self.update_idletasks()
 
-        self._data_line_holder = DataLineHolder(self, min_row=2, colspan=column)
+            self._top_data_line.connect_terminal(top_terminal)
+            self._bot_data_line.connect_terminal(bot_terminal)
+
+            column += 1
+
+        self._bot_data_line.deactivate()
+        self._top_data_line.activate()
         self._controller_view = ControllerView(self)
-        self._controller_view.grid(row=7, column=0)
+        self._controller_view.place(x=10, y=115)
+        self.configure(bg="white")
 
     def get_terminal_views(self):
         return self._terminal_views
 
     def get_lcs_thread(self):
         return LCSRunThread(self._lcs.process)
+
+    def on_line_state_changed(self, state):
+        if state == LineState.WORKING_LINE_B:
+            self._bot_data_line.activate()
+            self._top_data_line.deactivate()
+        else:
+            self._top_data_line.activate()
+            self._bot_data_line.deactivate()
+
+
+class Logger(tk.Frame):
+    def __init__(self, root):
+        super().__init__(root, width=900, height=500)
+        self.canvas = tk.Canvas(self, width=1000, height=500, scrollregion=(0, 0, 4999, 4999), bg="white")
+
+        self.text_frame = tk.Frame(self.canvas, bg="white", width=1000, height=500)
+        self.scroll_bar = tk.Scrollbar(self, orient=tk.VERTICAL, command=self.canvas.yview)
+        self.scroll_bar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.canvas.configure(yscrollcommand=self.scroll_bar.set)
+        self.canvas.create_window(0, 0, window=self.text_frame, anchor='nw')
+        self.canvas.pack(side=tk.LEFT)
+
+        self._row = 1
+
+    def log(self, log_message):
+        text_label = tk.Label(self.text_frame, font="Courier", text=f"{dt.datetime.now()}", bg="white")
+        text_label.grid(row=self._row, column=0)
+        text_label = tk.Label(self.text_frame, font="Courier", text=f"{log_message}", bg="white")
+        text_label.grid(row=self._row, column=1)
+
+        self._row += 1
 
 
 class StandaloneUI(tk.Frame):
@@ -167,14 +204,18 @@ class StandaloneUI(tk.Frame):
         self._change_frame_button = tk.Button(self, text='Перейти к статистической модели', command=change_frame_cb)
         self._change_frame_button.grid(column=0, row=0)
 
-        self._lcs_frame = LCSView(self)
+        self._logger_view = Logger(self)
+        self._logger_view.grid(column=0, row=2)
+
+        self._lcs_frame = LCSView(self, self._logger_view.log)
         self._lcs_frame.grid(column=0, row=1)
 
         self._state_select_button = tk.Button(self, text='Применить состояния ОУ',
                                               command=self._on_state_select_clicked)
-        self._state_select_button.grid(row=2, column=0)
+        self._state_select_button.grid(row=3, column=0)
         self._start_button = tk.Button(self, text='Запустить', command=self._on_start_clicked)
-        self._start_button.grid(row=3, column=0)
+        self._start_button.grid(row=4, column=0)
+        self.configure(bg="white")
 
     def _on_start_clicked(self):
         self._lcs_frame.get_lcs_thread().start()

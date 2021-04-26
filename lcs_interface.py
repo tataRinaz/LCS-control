@@ -16,6 +16,9 @@ class MainWindow:
         self._window_position_width = window_position_width
         self._buttons = []
         self._root = tk.Tk()
+        self._root.attributes("-fullscreen", True)
+        self._root.bind("<Escape>", self._on_escape_clicked)
+
         self.frames = {0: StatisticsUI(root=self._root,
                                        change_frame_cb=self._on_change_frame_clicked),
                        1: StandaloneUI(root=self._root,
@@ -27,7 +30,11 @@ class MainWindow:
         self._root.geometry(
             f'{self._window_height}x{self._window_width}+{self._window_position_height}+{self._window_position_width}')
         self._on_change_frame_clicked()
+        self._root.configure(bg="white")
         self._root.mainloop()
+
+    def _on_escape_clicked(self, event=None):
+        self._root.attributes("-fullscreen", False)
 
     def _on_change_frame_clicked(self):
         self.frames[self.active_frame].grid_forget()

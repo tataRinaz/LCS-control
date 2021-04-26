@@ -19,13 +19,14 @@ class LCSRunThread(Thread):
 class StatisticEntry(tk.Entry):
     def __init__(self, root, name, is_int: bool, correctness_checker, default_value, row):
         super().__init__(root)
-        self.text_label = tk.Label(root, text=name)
+        self.text_label = tk.Label(root, text=name, bg="white")
         self.text_label.grid(column=0, row=row)
         self.is_int = is_int
         self.correctness_checker = correctness_checker
         self.insert(tk.END, default_value)
         self.grid(column=1, row=row)
         self.focus()
+        self.configure(highlightbackground="black", highlightcolor="black", highlightthickness=1)
 
     def get(self):
         val = super().get()
@@ -50,9 +51,10 @@ class RunTaskBar(tk.Frame):
         self._frames_count = 100
         self._frames = [tk.Frame(self, bg='white', width=2, height=15) for _ in range(self._frames_count)]
         for index in range(self._frames_count):
-            self._frames[index].grid(row=0, column=index)
+            self._frames[index].grid(row=0, column=index + 1)
 
         self._current_frame_index = 0
+        self.configure(bg="white", highlightbackground="black", highlightcolor="black", highlightthickness=1)
 
     def set_session_count(self, session_count):
         self._sessions_count = session_count
@@ -79,7 +81,7 @@ class RunTaskBar(tk.Frame):
 
 class StatisticsUI(tk.Frame):
     def __init__(self, root, change_frame_cb):
-        super().__init__(root)
+        super().__init__(root, width=2000, height=1000)
         self.change_frame_cb = change_frame_cb
         self.change_frame_button = tk.Button(self, text='Перейти к визуальному образцу', command=self._on_clicked)
         self.change_frame_button.grid(column=0, row=0)
@@ -110,8 +112,13 @@ class StatisticsUI(tk.Frame):
         self.start_run = tk.Button(self, text='Запуск',
                                    command=self._on_start_statistic_clicked)
         self.start_run.grid(row=9, column=0)
+
+        self._text_label = tk.Label(self, text="Прогресс", bg="white")
+        self._text_label.grid(row=10, column=0)
+
         self.task_run_bar = RunTaskBar(self)
-        self.task_run_bar.grid(row=10, column=0)
+        self.task_run_bar.grid(row=10, column=1)
+        self.configure(bg="white")
 
     def _process_statistics(self, messages_count, groups_count, terminal_device_count, gen_prob, den_prob, fail_prob,
                             busy_prob, sessions_count):

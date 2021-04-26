@@ -10,20 +10,19 @@ default_sleep_time_ms = 100
 
 class LCS:
     def __init__(self, terminals_count: int, probabilities, system_type=LCSType.Standalone,
-                 sleep_time=default_sleep_time_ms, line_state_change_handler=None):
+                 sleep_time=default_sleep_time_ms, line_state_change_handler=None, logger_cb=None):
         self.type = system_type
         self.sleep_time_ms = sleep_time
+        self.logger_cb = logger_cb
         self.controller = ControlDevice(self.get_terminals, self.line_state_change, self.type, self.sleep_time_ms)
         self.terminals = [
             TerminalDevice(system_type, index, probabilities, self.get_line_state, self.line_state_change,
-                           self.get_terminals)
+                           self.get_terminals, logger_cb)
             for index in range(terminals_count)]
         self.line_state = LineState.WORKING_LINE_A
         self.line_state_change_handler = line_state_change_handler
 
     def process(self):
-        begin_time = self.controller.get_time()
-
         broken_states = None
         if self.type == LCSType.Statistics:
             broken_states = Counter(
@@ -31,7 +30,8 @@ class LCS:
                        map(lambda terminal: terminal.process(), self.terminals)))
         else:
             t.sleep(self.sleep_time_ms / 1000)
-            print('ЛВС - Запуск')
+            if self.logger_cb:
+                self.logger_cb('ЛВС - Запуск')
 
         while self.line_state == LineState.GENERATION:
             self.controller.process_generator_device()
@@ -40,9 +40,9 @@ class LCS:
             self.controller.process_client_device(terminal)
 
         if self.type == LCSType.Standalone:
-            print('ЛВС - Завершение')
+            self.logger_cb('ЛВС - Завершение')
 
-        return broken_states, self.controller.get_time() - begin_time
+        return broken_states
 
     def get_terminals(self):
         return self.terminals
@@ -63,7 +63,7 @@ class LCS:
                 return 'ЛИНИЯ B'
 
         if self.type == LCSType.Standalone:
-            print(f"ЛПИ - {to_string(new_state)}")
+            self.logger_cb(f"ЛПИ - {to_string(new_state)}")
 
         if any(map(lambda terminal: terminal.state == DeviceState.GENERATOR, self.terminals)):
             self.line_state = LineState.GENERATION
