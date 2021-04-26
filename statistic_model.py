@@ -105,7 +105,7 @@ def statistic_model(group_count, total_messages_count, terminals_count, probabil
         totals.denials_count += device_states_counter[DeviceState.DENIAL]
         totals.busy_count += device_states_counter[DeviceState.BUSY]
         totals.failures_count += device_states_counter[DeviceState.FAILURE]
-        totals.generators_count += device_states_counter[DeviceState.DENIAL]
+        totals.generators_count += device_states_counter[DeviceState.GENERATOR]
 
         if stats.generators_count != 0:
             totals.generators_indices.append(group_num)
@@ -166,6 +166,7 @@ class StatisticRunner:
                                     self._total_messages_count,
                                     self._terminals_count,
                                     self._probabilities.copy())[-1]
+        statistic.run_index = self._run_index
         print(f"Finished {index}")
 
         self._mutex.acquire()
@@ -189,6 +190,7 @@ class StatisticRunner:
         return self._processed_count == self._sessions_count
 
     def results(self):
+        self._results.sort(key=lambda stat: stat.run_index)
         return self._results
 
 
