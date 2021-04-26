@@ -140,7 +140,7 @@ class LCSRunThread(Thread):
 class StatisticRunner:
     def __init__(self, sessions_count, group_count, total_messages_count, terminals_count, probabilities,
                  task_bar_update_cb):
-        self._statistics_per_run = 25
+        self._statistics_per_run = 10
         assert sessions_count % self._statistics_per_run == 0,\
             f"Sessions count should be divisible by {self._statistics_per_run}"
         self._sessions_count = sessions_count
@@ -150,21 +150,27 @@ class StatisticRunner:
         self._probabilities = probabilities
         self._task_bar_update_cb = task_bar_update_cb
         self._processed_count = 0
-        self._started_index = 0
+        self._run_index = 0
         self._mutex = Lock()
 
         self._results = []
 
     def make_statistic(self):
+        self._mutex.acquire()
+        index = self._run_index
+        self._run_index += 1
+        print(f"Running {index}")
+        self._mutex.release()
+
         statistic = statistic_model(self._group_count,
                                     self._total_messages_count,
                                     self._terminals_count,
                                     self._probabilities.copy())[-1]
+        print(f"Finished {index}")
 
         self._mutex.acquire()
         self._task_bar_update_cb(1)
         self._processed_count += 1
-        print(f"Finished {self._processed_count}")
         self._mutex.release()
 
         return statistic

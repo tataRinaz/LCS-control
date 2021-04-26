@@ -1,4 +1,3 @@
-import lcs as lcs
 import lcs_interface as interface
 
 
