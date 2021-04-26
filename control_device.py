@@ -107,7 +107,7 @@ class ControlDevice:
     def process_busy(self, client):
         if self.type == LCSType.Standalone:
             t.sleep(self.sleep_time_ms / 1000)
-        client.end_messaging("Terminal device: Busy")
+        client.end_messaging("Абонент занят")
 
     def process_failure(self, client):
         if self.type == LCSType.Standalone:
