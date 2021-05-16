@@ -69,13 +69,15 @@ class TerminalDeviceView(tk.Frame):
         return self._is_up
 
 
-class ControllerView(tk.Frame):
+class ControllerView(tk.Canvas):
     def __init__(self, root):
-        super().__init__(root)
-        self._text_label = tk.Label(self, text='Контроллер')
-        self._text_label.grid(row=0, column=0)
-        self.configure(highlightbackground="red", highlightcolor="red", highlightthickness=5,
-                       bg="yellow")
+        super().__init__(root, width=80, height=50)
+        self._text_label = tk.Label(self, text='К-A')
+        self._text_label.place(x=30, y=5)
+        self._text_label = tk.Label(self, text='К-B')
+        self._text_label.place(x=30, y=34)
+        self.create_line(0, 30, 90, 30, fill="red", width=5)
+        self.configure(highlightbackground="red", highlightcolor="red", highlightthickness=5)
 
 
 class LCSRunThread(Thread):
@@ -103,7 +105,7 @@ class DataLineView:
         self._lines = [self._root.create_line(position_start[0], position_start[1], position_end[0],
                                               position_end[1],
                                               width=5),
-                       self._root.create_line(position_end[0], position_end[1], position_end[0] + 1400,
+                       self._root.create_line(position_end[0], position_end[1], position_end[0] + 1700,
                                               position_end[1], width=5)]
 
     def activate(self):
@@ -140,8 +142,8 @@ class LCSView(tk.Canvas):
         for i in range(int(terminals_count)):
             top_terminal = TerminalDeviceView(self, i, self._lcs.get_terminals, True)
             bot_terminal = TerminalDeviceView(self, i, self._lcs.get_terminals, False)
-            top_terminal.place(x=100 + 70 * i, y=60)
-            bot_terminal.place(x=100 + 70 * i, y=130)
+            top_terminal.place(x=110 + 80 * i, y=60)
+            bot_terminal.place(x=110 + 80 * i, y=130)
 
             self._terminal_views.append(top_terminal)
             self._terminal_views.append(bot_terminal)

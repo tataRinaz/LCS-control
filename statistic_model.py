@@ -2,6 +2,8 @@ import csv
 from collections import Counter
 from threading import Thread, Lock
 
+from typing import List
+
 import lcs
 from states import LCSType, DeviceState
 
@@ -94,7 +96,7 @@ def statistic_model(group_count, total_messages_count, terminals_count, probabil
 
         device_states_counter = Counter()
         for _ in range(lcs_runs_count):
-            statistics_result, _ = system.process()
+            statistics_result = system.process()
             device_states_counter += statistics_result
 
         stats.denials_count = device_states_counter[DeviceState.DENIAL]
@@ -141,7 +143,7 @@ class StatisticRunner:
     def __init__(self, sessions_count, group_count, total_messages_count, terminals_count, probabilities,
                  task_bar_update_cb):
         self._statistics_per_run = 10
-        assert sessions_count % self._statistics_per_run == 0,\
+        assert sessions_count % self._statistics_per_run == 0, \
             f"Sessions count should be divisible by {self._statistics_per_run}"
         self._sessions_count = sessions_count
         self._group_count = group_count
@@ -153,7 +155,7 @@ class StatisticRunner:
         self._run_index = 0
         self._mutex = Lock()
 
-        self._results = []
+        self._results: List[Statistics] = []
 
     def make_statistic(self):
         self._mutex.acquire()
@@ -166,7 +168,7 @@ class StatisticRunner:
                                     self._total_messages_count,
                                     self._terminals_count,
                                     self._probabilities.copy())[-1]
-        statistic.run_index = self._run_index
+        statistic.run_index = index
         print(f"Finished {index}")
 
         self._mutex.acquire()
@@ -190,7 +192,22 @@ class StatisticRunner:
         return self._processed_count == self._sessions_count
 
     def results(self):
+        if not self.is_ready():
+            return None
+
         self._results.sort(key=lambda stat: stat.run_index)
+        total_statistic = Statistics()
+        total_statistic.run_index = 50
+        total_statistic.failures_count = sum(stat.failures_count for stat in self._results)
+        total_statistic.busy_count = sum(stat.busy_count for stat in self._results)
+        total_statistic.denials_count = sum(stat.denials_count for stat in self._results)
+        total_statistic.generators_count = sum(1 for stat in self._results if stat.generators_count != 0)
+        total_statistic.math_expectation = sum(stat.math_expectation for stat in self._results) / self._sessions_count
+        total_statistic.standard_deviation = sum(
+            stat.standard_deviation for stat in self._results) / self._sessions_count
+
+        self._results.append(total_statistic)
+
         return self._results
 
 
@@ -223,8 +240,14 @@ def write_sessions_statistic_to_csv(output_filename, statistics):
     with open(output_filename, 'w', newline='') as csv_file:
         writer = csv.writer(csv_file, delimiter=',')
         writer.writerow(field_names)
-        for statistic in statistics:
+        for index, statistic in enumerate(statistics):
             denials_stats = str(statistic.denials_count) + ": " + ",".join(map(str, statistic.denials_indices))
+
+            # Index 50 is the total statistic it shouldn't be compressed
+            if statistic.generators_count != 0 and index != 50:
+                statistic.generators_count = 1
+                statistic.generators_indices = statistic.generators_indices[:1]
+
             generator_stats = str(statistic.generators_count) + ": " + ",".join(map(str, statistic.generators_indices))
 
             row = [str(statistic.run_index),
