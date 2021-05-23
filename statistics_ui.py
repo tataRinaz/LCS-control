@@ -119,6 +119,7 @@ class StatisticsUI(tk.Frame):
         self.task_run_bar = RunTaskBar(self)
         self.task_run_bar.grid(row=10, column=1)
         self.configure(bg="white")
+        self.count = 1
 
     def _process_statistics(self, messages_count, groups_count, terminal_device_count, gen_prob, den_prob, fail_prob,
                             busy_prob, sessions_count):
@@ -133,7 +134,8 @@ class StatisticsUI(tk.Frame):
                 statistic = statistic_model(groups_count, messages_count, terminal_device_count,
                                             [gen_prob, den_prob, fail_prob, busy_prob])
 
-                write_single_statistic_to_csv('output.csv', statistic)
+                write_single_statistic_to_csv(f'output{self.count}.csv', statistic)
+                self.count += 1
             else:
                 runner = StatisticRunner(sessions_count, groups_count, messages_count, terminal_device_count,
                                          [gen_prob, den_prob, fail_prob, busy_prob], self.task_run_bar.update_bar)

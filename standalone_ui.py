@@ -93,6 +93,7 @@ class LCSRunThread(Thread):
 
 
 ACTIVE_COLOR = "green"
+GENERATION_COLOR = "blue"
 INACTIVE_COLOR = "gray"
 
 
@@ -115,6 +116,10 @@ class DataLineView:
     def deactivate(self):
         for line_index in self._lines:
             self._root.itemconfig(line_index, fill=INACTIVE_COLOR)
+
+    def generation(self):
+        for line_index in self._lines:
+            self._root.itemconfig(line_index, fill=GENERATION_COLOR)
 
     def connect_terminal(self, terminal: TerminalDeviceView):
         is_up = terminal.is_up()
@@ -171,6 +176,9 @@ class LCSView(tk.Canvas):
         if state == LineState.WORKING_LINE_B:
             self._bot_data_line.activate()
             self._top_data_line.deactivate()
+        elif state == LineState.GENERATION:
+            self._top_data_line.generation()
+            self._bot_data_line.deactivate()
         else:
             self._top_data_line.activate()
             self._bot_data_line.deactivate()

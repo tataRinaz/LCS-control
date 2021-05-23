@@ -224,7 +224,7 @@ def write_single_statistic_to_csv(output_filename, statistics):
 
         statistics = list(map(modify, statistics))
 
-    with open(output_filename, 'w', newline='') as csv_file:
+    with open(output_filename, 'w', newline='', encoding='utf-8') as csv_file:
         writer = csv.writer(csv_file, delimiter=',')
         writer.writerow(field_names)
         for statistic in statistics:
@@ -237,7 +237,7 @@ def write_sessions_statistic_to_csv(output_filename, statistics):
     field_names = ['Номер сеанса', 'Число сбоев', 'Число "абонент занят"', 'Число отказов и m для каждого из них',
                    'Число генераций и Nг для каждого из них', 'Среднее время передачи сообщения', 'СКО']
 
-    with open(output_filename, 'w', newline='') as csv_file:
+    with open(output_filename, 'w', newline='', encoding='utf-8') as csv_file:
         writer = csv.writer(csv_file, delimiter=',')
         writer.writerow(field_names)
         for index, statistic in enumerate(statistics):
