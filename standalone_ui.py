@@ -68,6 +68,11 @@ class TerminalDeviceView(tk.Frame):
     def is_up(self):
         return self._is_up
 
+    def on_message(self, is_active):
+        color = "#5FFFAF" if is_active else "white"
+        self.configure(bg=color)
+        self._name_label.configure(bg=color)
+
 
 class ControllerView(tk.Canvas):
     def __init__(self, root):
@@ -140,7 +145,8 @@ class LCSView(tk.Canvas):
         self._bot_data_line = DataLineView(self, "B", (50, 135), (50, 245))
 
         self._lcs = LCS(terminals_count=terminals_count, probabilities=[0, 0, 0, 0],
-                        line_state_change_handler=self.on_line_state_changed, logger_cb=logger_cb)
+                        line_state_change_handler=self.on_line_state_changed, logger_cb=logger_cb,
+                        on_message=self.on_message)
         self._terminal_views = []
         column = 1
 
@@ -182,6 +188,12 @@ class LCSView(tk.Canvas):
         else:
             self._top_data_line.activate()
             self._bot_data_line.deactivate()
+
+    def on_message(self, index, is_active):
+        line_state = self._lcs.get_line_state()
+        terminal = 2 * index + 1 if line_state == LineState.WORKING_LINE_B else 2 * index
+        self._terminal_views[terminal].on_message(is_active)
+
 
 
 class Logger(tk.Frame):

@@ -4,7 +4,7 @@ from randoms import get_random_state
 
 class TerminalDevice:
     def __init__(self, system, index, probabilities, line_state_callback, line_state_change_callback,
-                 terminals_callback, logger_cb=None):
+                 terminals_callback, logger_cb=None, on_message=None):
         self.system = system
         self.index = index
         self.state = DeviceState.INITIAL
@@ -16,7 +16,7 @@ class TerminalDevice:
         self.state_change_callbacks = []
         self.logger_cb = logger_cb
         self.last_message = None
-        self.active = False
+        self.on_message = on_message
 
     def _on_message_received(self, message):
         if self.system == LCSType.Standalone:
@@ -37,11 +37,11 @@ class TerminalDevice:
 
     def start_messaging(self, message):
         self._on_message_received(message)
-        self.active = True
+        self.on_message(self.index, True)
 
     def end_messaging(self, message):
         self._on_message_received(message)
-        self.active = False
+        self.on_message(self.index, False)
 
     def change_state(self, new_state):
         if self.state == DeviceState.BLOCKED and new_state == DeviceState.UNBLOCKING:

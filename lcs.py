@@ -10,14 +10,15 @@ default_sleep_time_ms = 100
 
 class LCS:
     def __init__(self, terminals_count: int, probabilities, system_type=LCSType.Standalone,
-                 sleep_time=default_sleep_time_ms, line_state_change_handler=None, logger_cb=None):
+                 sleep_time=default_sleep_time_ms, line_state_change_handler=None, logger_cb=None,
+                 on_message=None):
         self.type = system_type
         self.sleep_time_ms = sleep_time
         self.logger_cb = logger_cb
         self.controller = ControlDevice(self.get_terminals, self.line_state_change, self.type, self.sleep_time_ms)
         self.terminals = [
             TerminalDevice(system_type, index, probabilities, self.get_line_state, self.line_state_change,
-                           self.get_terminals, logger_cb)
+                           self.get_terminals, logger_cb, on_message)
             for index in range(terminals_count)]
         self.line_state = LineState.WORKING_LINE_A
         self.line_state_change_handler = line_state_change_handler
