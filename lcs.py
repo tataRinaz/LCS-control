@@ -21,6 +21,7 @@ class LCS:
                            self.get_terminals, logger_cb, on_message)
             for index in range(terminals_count)]
         self.line_state = LineState.WORKING_LINE_A
+        self.last_received_state = LineState.WORKING_LINE_A
         self.line_state_change_handler = line_state_change_handler
 
     def process(self):
@@ -51,9 +52,14 @@ class LCS:
     def get_line_state(self):
         return self.line_state
 
+    def get_last_state(self):
+        return self.last_received_state
+
     def line_state_change(self, new_state):
         if self.line_state_change_handler:
             self.line_state_change_handler(new_state)
+
+        self.last_received_state = new_state
 
         def to_string(state):
             if state == LineState.GENERATION:

@@ -190,10 +190,9 @@ class LCSView(tk.Canvas):
             self._bot_data_line.deactivate()
 
     def on_message(self, index, is_active):
-        line_state = self._lcs.get_line_state()
+        line_state = self._lcs.get_last_state()
         terminal = 2 * index + 1 if line_state == LineState.WORKING_LINE_B else 2 * index
         self._terminal_views[terminal].on_message(is_active)
-
 
 
 class Logger(tk.Frame):
