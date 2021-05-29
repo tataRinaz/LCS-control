@@ -30,6 +30,7 @@ class TerminalDeviceView(tk.Frame):
         super().__init__(root, width=300, height=100)
         self.index = device_index
         self.devices_cb = devices_cb
+        self._is_up = is_up
 
         self.device_state_view = tk.Frame(self, bg='#000000', width=10, height=10)
         self.device_state_view.grid(row=1, column=0)
@@ -47,7 +48,6 @@ class TerminalDeviceView(tk.Frame):
         self._name_label = tk.Label(self, text=f'ОУ №{self.index + 1}')
         self._name_label.grid(row=2, column=0)
         self.process_state_change()
-        self._is_up = is_up
         self.configure(highlightbackground="green", highlightcolor="green", highlightthickness=5)
 
     def process_state_change(self):
@@ -56,12 +56,15 @@ class TerminalDeviceView(tk.Frame):
         value = self.device_state.get()
 
         if len(value) != 0:
-            devices[self.index].change_state(options_map[value])
+            if self._is_up:
+                devices[self.index].change_state(options_map[value])
             self._recolor_on_state()
 
     def _recolor_on_state(self):
         devices = self.devices_cb()
         state = devices[self.index].state
+        if not self._is_up and state != DeviceState.DENIAL and state != DeviceState.BLOCKED:
+            state = DeviceState.WORKING
         self.device_state.set(state_to_name[state])
         self.device_state_view.configure(bg=state_to_color[state])
 
@@ -219,6 +222,18 @@ class Logger(tk.Frame):
         self._row += 1
 
 
+class FileLogger:
+    def __init__(self):
+        self._filename = "log.txt"
+        self._file = open(self._filename, "w", encoding='utf-8')
+
+    def log(self, log_message):
+        self._file.write(f"{dt.datetime.now()}      {log_message}\n")
+
+    def __del__(self):
+        self._file.close()
+
+
 class StandaloneUI(tk.Frame):
     def __init__(self, root, change_frame_cb):
         super().__init__(root)
@@ -227,8 +242,9 @@ class StandaloneUI(tk.Frame):
 
         self._logger_view = Logger(self)
         self._logger_view.grid(column=0, row=2)
+        self._file_logger = FileLogger()
 
-        self._lcs_frame = LCSView(self, self._logger_view.log)
+        self._lcs_frame = LCSView(self, [self._logger_view.log, self._file_logger.log])
         self._lcs_frame.grid(column=0, row=1)
 
         self._state_select_button = tk.Button(self, text='Применить состояния ОУ',

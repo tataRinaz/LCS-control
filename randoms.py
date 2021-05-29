@@ -1,5 +1,6 @@
 import numpy as np
 from states import *
+from collections import Counter
 
 
 def get_random_state(probabilities):

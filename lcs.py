@@ -5,7 +5,7 @@ from terminal_device import TerminalDevice
 from control_device import ControlDevice
 from states import *
 
-default_sleep_time_ms = 100
+default_sleep_time_ms = 200
 
 
 class LCS:
@@ -32,8 +32,8 @@ class LCS:
                        map(lambda terminal: terminal.process(), self.terminals)))
         else:
             t.sleep(self.sleep_time_ms / 1000)
-            if self.logger_cb:
-                self.logger_cb('ЛВС - Запуск')
+            for logger in self.logger_cb:
+                logger('ЛВС - Запуск')
 
         while self.line_state == LineState.GENERATION:
             self.controller.process_generator_device()
@@ -42,7 +42,8 @@ class LCS:
             self.controller.process_client_device(terminal)
 
         if self.type == LCSType.Standalone:
-            self.logger_cb('ЛВС - Завершение')
+            for logger in self.logger_cb:
+                logger('ЛВС - Завершение')
 
         return broken_states
 
@@ -70,7 +71,8 @@ class LCS:
                 return 'ЛИНИЯ B'
 
         if self.type == LCSType.Standalone:
-            self.logger_cb(f"ЛПИ - {to_string(new_state)}")
+            for logger in self.logger_cb:
+                logger(f"ЛПИ - {to_string(new_state)}")
 
         if any(map(lambda terminal: terminal.state == DeviceState.GENERATOR, self.terminals)):
             self.line_state = LineState.GENERATION

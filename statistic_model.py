@@ -55,8 +55,9 @@ def process_statistics(stats: [Statistics]):
     denial_count = 0
 
     generator_index = get_value_index(stats, 'generators_count')
+    generator_index = generator_index[0] if len(generator_index) != 0 else None
 
-    generator_wasted_time = 3.08 + 0.052 * generator_index[0] if len(generator_index) != 0 else 0.
+    generator_wasted_time = 3.08 + 0.052 * generator_index if generator_index else 0.
 
     def make_correct(val):
         return int(val * 1000) / 1000
@@ -70,15 +71,16 @@ def process_statistics(stats: [Statistics]):
         if i == 0:
             wasted_time += generator_wasted_time
 
-        if generator_index is not None:
+        if generator_index:
             wasted_time += 29.920
 
         stats[i].elapsed_time = make_correct(wasted_time)
 
     math_expectation = sum(stat.elapsed_time for stat in stats) / len(stats)
     standart_deviation = (sum((math_expectation - stat.elapsed_time) ** 2 for stat in stats) / len(stats)) ** 0.5
+    elapsed_time = sum(stat.elapsed_time for stat in stats)
 
-    return make_correct(math_expectation), make_correct(standart_deviation)
+    return make_correct(math_expectation), make_correct(standart_deviation), make_correct(elapsed_time)
 
 
 def statistic_model(group_count, total_messages_count, terminals_count, probabilities):
@@ -118,10 +120,11 @@ def statistic_model(group_count, total_messages_count, terminals_count, probabil
         unprocessed_messages -= messages_per_run
         statistics.append(stats)
 
-    math_expect, standard_deviation = process_statistics(statistics)
+    math_expect, standard_deviation, elapsed_time = process_statistics(statistics)
 
     totals.math_expectation = math_expect
     totals.standard_deviation = standard_deviation
+    totals.elapsed_time = elapsed_time
     statistics.append(totals)
 
     return statistics
@@ -133,10 +136,7 @@ class LCSRunThread(Thread):
         self.task = task
 
     def run(self):
-        try:
-            self.task()
-        except Exception as e:
-            print(e)
+        self.task()
 
 
 class StatisticRunner:
@@ -172,7 +172,8 @@ class StatisticRunner:
         print(f"Finished {index}")
 
         self._mutex.acquire()
-        self._task_bar_update_cb(1)
+        if self._task_bar_update_cb:
+            self._task_bar_update_cb(1)
         self._processed_count += 1
         self._mutex.release()
 
@@ -231,6 +232,7 @@ def write_single_statistic_to_csv(output_filename, statistics):
             writer.writerow(statistic.as_list())
 
         csv_file.close()
+        print("Finished")
 
 
 def write_sessions_statistic_to_csv(output_filename, statistics):
@@ -260,3 +262,8 @@ def write_sessions_statistic_to_csv(output_filename, statistics):
             writer.writerow(row)
 
         csv_file.close()
+
+
+if __name__ == '__main__':
+    statistic = statistic_model(20, 20000, 18, [0, 0, 0, 0])
+    write_single_statistic_to_csv(f'output{0}.csv', statistic)

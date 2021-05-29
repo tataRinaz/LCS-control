@@ -1,7 +1,7 @@
 import time as t
 
 from states import *
-from time_counter import TimeCounter
+from terminal_device import TerminalDevice
 
 
 # TODO: refactor ideas: 1. Add function wait_for(sleep coef) 2. Add function append_time_series
@@ -42,6 +42,7 @@ class ControlDevice:
                 t.sleep(self.sleep_time_ms * 0.5 / 1000)
 
         generator_index = None
+        self.line_state_change_callback(LineState.WORKING_LINE_A)
         for index in range(terminals_count):
             if self.type == LCSType.Standalone:
                 t.sleep(self.sleep_time_ms / 1000)
@@ -60,7 +61,6 @@ class ControlDevice:
                 t.sleep(self.sleep_time_ms * 0.5 / 1000)
 
             terminals[index].start_messaging("Опрос")
-            self.line_state_change_callback(LineState.WORKING_LINE_A)
             if terminals[index].state != DeviceState.GENERATOR:
                 if self.type == LCSType.Standalone:
                     t.sleep(self.sleep_time_ms / 1000)
@@ -73,8 +73,6 @@ class ControlDevice:
             if self.type == LCSType.Standalone:
                 t.sleep(self.sleep_time_ms / 1000)
 
-            self.line_state_change_callback(LineState.WORKING_LINE_B)
-
             if self.type == LCSType.Standalone:
                 t.sleep(self.sleep_time_ms * 0.5 / 1000)
 
@@ -83,6 +81,8 @@ class ControlDevice:
 
             terminals[index].end_messaging("Отказ генератора")
             terminals[index].change_state(DeviceState.DENIAL)
+
+            self.line_state_change_callback(LineState.WORKING_LINE_B)
 
             if self.type == LCSType.Standalone:
                 t.sleep(self.sleep_time_ms * 0.5 / 1000)
@@ -104,26 +104,56 @@ class ControlDevice:
 
         self.line_state_change_callback(LineState.WORKING_LINE_A)
 
-    def process_busy(self, client):
+    def process_busy(self, client: TerminalDevice):
         if self.type == LCSType.Standalone:
             t.sleep(self.sleep_time_ms / 1000)
         client.end_messaging("Абонент занят")
+        if self.type == LCSType.Standalone:
+            t.sleep(self.sleep_time_ms * 2 / 1000)
+        client.start_messaging("Занят. Повторное сообщение")
+        client.change_state(DeviceState.WORKING)
 
-    def process_failure(self, client):
+        if self.type == LCSType.Standalone:
+            t.sleep(self.sleep_time_ms / 1000)
+        self.process_busy(client)
+
+    def process_failure(self, client: TerminalDevice):
         if self.type == LCSType.Standalone:
             t.sleep(self.sleep_time_ms / 1000)
         client.end_messaging("Сбой")
+        if self.type == LCSType.Standalone:
+            t.sleep(self.sleep_time_ms / 1000)
+        client.start_messaging("Сбой. Повторное сообщение")
+        client.change_state(DeviceState.WORKING)
 
-    def process_blocked(self, client):
+        if self.type == LCSType.Standalone:
+            t.sleep(self.sleep_time_ms / 1000)
+        self.process_ok(client)
+
+    def process_blocked(self, client: TerminalDevice):
         client.end_messaging("Заблокирован")
 
-    def process_denial(self, client):
+    def process_denial(self, client: TerminalDevice):
+        if self.type == LCSType.Standalone:
+            t.sleep(self.sleep_time_ms / 1000)
         client.end_messaging("Отказ")
+        if self.type == LCSType.Standalone:
+            t.sleep(self.sleep_time_ms / 1000)
+        client.start_messaging("Отказ. Повторное сообщение")
+        if self.type == LCSType.Standalone:
+            t.sleep(self.sleep_time_ms / 1000)
+        client.end_messaging("Отсутствие ответного слова")
+        self.line_state_change_callback(LineState.WORKING_LINE_B)
+        client.start_messaging("Отказ")
+        if self.type == LCSType.Standalone:
+            t.sleep(self.sleep_time_ms / 1000)
+        client.end_messaging("Отсутствие ответного слова")
+        self.line_state_change_callback(LineState.WORKING_LINE_A)
 
-    def process_ok(self, client):
+    def process_ok(self, client: TerminalDevice):
         client.end_messaging("Ок")
 
-    def process_client_device(self, client):
+    def process_client_device(self, client: TerminalDevice):
         client.start_messaging("Опрос")
         if self.type == LCSType.Standalone:
             t.sleep(self.sleep_time_ms / 1000)
