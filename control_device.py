@@ -115,7 +115,7 @@ class ControlDevice:
 
         if self.type == LCSType.Standalone:
             t.sleep(self.sleep_time_ms / 1000)
-        self.process_busy(client)
+        self.process_ok(client)
 
     def process_failure(self, client: TerminalDevice):
         if self.type == LCSType.Standalone:
