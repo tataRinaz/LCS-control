@@ -2,6 +2,16 @@ from states import *
 from randoms import get_random_state
 
 
+DEVICE_STATE_TO_COLOR = {
+    DeviceState.WORKING: MessageState.SUCCESS,
+    DeviceState.BLOCKED: MessageState.SUCCESS,
+    DeviceState.GENERATOR: MessageState.SUCCESS,
+    DeviceState.BUSY: MessageState.BUSY,
+    DeviceState.DENIAL: MessageState.NO_ANSWER,
+    DeviceState.FAILURE: MessageState.NO_ANSWER,
+}
+
+
 class TerminalDevice:
     def __init__(self, system, index, probabilities, line_state_callback, line_state_change_callback,
                  terminals_callback, logger_cb=None, on_message=None):
@@ -39,13 +49,14 @@ class TerminalDevice:
 
     def start_messaging(self, message):
         self._on_message_received(message)
+        message_state = DEVICE_STATE_TO_COLOR[self.state]
         if self.on_message:
-            self.on_message(self.index, True)
+            self.on_message(self.index, message_state)
 
     def end_messaging(self, message):
         self._on_message_received(message)
         if self.on_message:
-            self.on_message(self.index, False)
+            self.on_message(self.index, MessageState.MESSAGE_FINISHED)
 
     def change_state(self, new_state):
         if self.state == DeviceState.BLOCKED and new_state == DeviceState.UNBLOCKING:

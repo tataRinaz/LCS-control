@@ -32,3 +32,10 @@ class Timestamp(enum.Enum):
 class LCSType:
     Standalone = 1,
     Statistics = 2
+
+
+class MessageState(enum.Enum):
+    SUCCESS = 2,
+    BUSY = 3,
+    NO_ANSWER = 4,
+    MESSAGE_FINISHED = 5

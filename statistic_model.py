@@ -152,7 +152,7 @@ class StatisticRunner:
         self._probabilities = probabilities
         self._task_bar_update_cb = task_bar_update_cb
         self._processed_count = 0
-        self._run_index = 0
+        self._run_index = 1
         self._mutex = Lock()
 
         self._results: List[Statistics] = []
@@ -213,7 +213,7 @@ class StatisticRunner:
 
 
 def write_single_statistic_to_csv(output_filename, statistics):
-    field_names = ['Тысяча сообщений', 'Отказов', 'Сбоев', '"АБонент занят"',
+    field_names = ['Тысяча сообщений', 'Отказов', 'Сбоев', '"Абонент занят"',
                    'Наличие генератора', 'Затраченное время, мс', 'МО', 'СКО']
 
     generator_index = get_value_index(statistics, 'generators_count')
@@ -242,16 +242,18 @@ def write_sessions_statistic_to_csv(output_filename, statistics):
     with open(output_filename, 'w', newline='', encoding='utf-8') as csv_file:
         writer = csv.writer(csv_file, delimiter=',')
         writer.writerow(field_names)
-        for index, statistic in enumerate(statistics):
+
+        for statistic in statistics:
             denials_stats = str(statistic.denials_count) + ": " + ",".join(map(str, statistic.denials_indices))
 
-            # Index 50 is the total statistic it shouldn't be compressed
-            if statistic.generators_count != 0 and index != 50:
+            is_totals = statistic.run_index != len(statistics)
+            if statistic.generators_count != 0 and is_totals:
                 statistic.generators_count = 1
                 statistic.generators_indices = statistic.generators_indices[:1]
 
             generator_stats = str(statistic.generators_count) + ": " + ",".join(map(str, statistic.generators_indices))
 
+            ind = str(statistic.run_index) if not is_totals else 'Итого'
             row = [str(statistic.run_index),
                    str(statistic.failures_count),
                    str(statistic.busy_count),

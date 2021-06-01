@@ -2,7 +2,7 @@ import tkinter as tk
 import datetime as dt
 
 from lcs import LCS
-from states import DeviceState, LineState
+from states import DeviceState, LineState, MessageState
 from threading import Thread
 
 state_to_color = {
@@ -63,7 +63,7 @@ class TerminalDeviceView(tk.Frame):
     def _recolor_on_state(self):
         devices = self.devices_cb()
         state = devices[self.index].state
-        if not self._is_up and state != DeviceState.DENIAL and state != DeviceState.BLOCKED:
+        if not self._is_up:
             state = DeviceState.WORKING
         self.device_state.set(state_to_name[state])
         self.device_state_view.configure(bg=state_to_color[state])
@@ -71,8 +71,17 @@ class TerminalDeviceView(tk.Frame):
     def is_up(self):
         return self._is_up
 
-    def on_message(self, is_active):
-        color = "#5FFFAF" if is_active else "white"
+    def on_message(self, message_state):
+        if message_state == MessageState.NO_ANSWER:
+            color = "#db6e6e"
+        elif message_state == MessageState.SUCCESS:
+            color = "#7ed981"
+        elif message_state == MessageState.BUSY:
+            color = "#cfd186"
+        else:
+            color = "white"
+        if not self._is_up and message_state != MessageState.MESSAGE_FINISHED:
+            color = "#7ed981"
         self.configure(bg=color)
         self._name_label.configure(bg=color)
 
@@ -192,10 +201,10 @@ class LCSView(tk.Canvas):
             self._top_data_line.activate()
             self._bot_data_line.deactivate()
 
-    def on_message(self, index, is_active):
+    def on_message(self, index, message_state):
         line_state = self._lcs.get_last_state()
         terminal = 2 * index + 1 if line_state == LineState.WORKING_LINE_B else 2 * index
-        self._terminal_views[terminal].on_message(is_active)
+        self._terminal_views[terminal].on_message(message_state)
 
 
 class Logger(tk.Frame):

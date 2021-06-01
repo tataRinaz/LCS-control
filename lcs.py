@@ -5,7 +5,7 @@ from terminal_device import TerminalDevice
 from control_device import ControlDevice
 from states import *
 
-default_sleep_time_ms = 200
+default_sleep_time_ms = 500
 
 
 class LCS:
